@@ -13,7 +13,7 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
       resultImageSize: '=',
       resultImageFormat: '@',
       resultImageQuality: '=',
-
+      cropArea: '=',
       onChange: '&',
       onLoadBegin: '&',
       onLoadDone: '&',
@@ -33,15 +33,16 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
       // Store Result Image to check if it's changed
       var storedResultImage;
 
+      //Cropping image is done server side
       var updateResultImage=function(scope) {
-        var resultImage=cropHost.getResultImageDataURI();
-        if(storedResultImage!==resultImage) {
-          storedResultImage=resultImage;
-          if(angular.isDefined(scope.resultImage)) {
-            scope.resultImage=resultImage;
-          }
-          scope.onChange({$dataURI: scope.resultImage});
-        }
+        // var resultImage=cropHost.getResultImageDataURI();
+        // if(storedResultImage!==resultImage) {
+        //   storedResultImage=resultImage;
+        //   if(angular.isDefined(scope.resultImage)) {
+        //     scope.resultImage=resultImage;
+        //   }
+        //   scope.onChange({$dataURI: scope.resultImage});
+        // }
       };
 
       // Wrapper to safely exec functions within $apply on a running $digest cycle
@@ -72,6 +73,11 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
           }
         }))
         .on('area-move-end area-resize-end image-updated', fnSafeApply(function(scope){
+          scope.cropArea = {
+            x: cropHost.getArea().getX(),
+            y: cropHost.getArea().getY(),
+            size: cropHost.getArea().getSize(),
+          };
           updateResultImage(scope);
         }));
 

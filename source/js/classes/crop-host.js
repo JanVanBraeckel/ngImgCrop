@@ -163,6 +163,9 @@ crop.factory('cropHost', ['$document', 'cropAreaCircle', 'cropAreaSquare', 'crop
       }
     };
 
+    this.getArea = function() {
+      return theArea;
+    };
 
     this.getResultImageDataURI=function() {
       var temp_ctx, temp_canvas;
