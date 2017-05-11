@@ -73,12 +73,8 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
           }
         }))
         .on('area-move-end area-resize-end image-updated', fnSafeApply(function(scope){
-          scope.cropArea = {
-            x: cropHost.getArea().getX(),
-            y: cropHost.getArea().getY(),
-            size: cropHost.getArea().getSize(),
-          };
           updateResultImage(scope);
+          scope.cropArea = cropHost.getCropArea();
         }));
 
       // Sync CropHost with Directive's options
