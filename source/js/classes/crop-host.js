@@ -55,22 +55,19 @@ crop.factory('cropHost', ['$document', 'cropAreaCircle', 'cropAreaSquare', 'crop
             if (image !== null) {
 
                 ctx.save();
-
+                ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2);
                 ctx.rotate(imageRotation * Math.PI / 180);
 
                 // draw source image
-                ctx.drawImage(image, 0, 0, ctx.canvas.width, ctx.canvas.height);
-                ctx.restore();
+                ctx.drawImage(image, ctx.canvas.width/2, ctx.canvas.height/2, -ctx.canvas.width, -ctx.canvas.height);
 
                 // and make it darker
-                ctx.save();
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-                ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-                ctx.restore();
+                ctx.fillRect(ctx.canvas.width/2, ctx.canvas.height/2, -ctx.canvas.width, -ctx.canvas.height);
 
                 // draw Area
                 theArea.draw();
+                ctx.restore();
             }
         }
 
