@@ -10,6 +10,7 @@ crop.factory('cropArea', ['cropCanvas', function(CropCanvas) {
     this._cropCanvas=new CropCanvas(ctx);
 
     this._image=new Image();
+    this._imageRotation = 0;
     this._x = 0;
     this._y = 0;
     this._size = 200;
@@ -20,8 +21,9 @@ crop.factory('cropArea', ['cropCanvas', function(CropCanvas) {
   CropArea.prototype.getImage = function () {
     return this._image;
   };
-  CropArea.prototype.setImage = function (image) {
+  CropArea.prototype.setImage = function (image, imageRotation) {
     this._image = image;
+    this._imageRotation = imageRotation;
   };
 
   CropArea.prototype.getX = function () {
@@ -73,7 +75,7 @@ crop.factory('cropArea', ['cropCanvas', function(CropCanvas) {
 
   CropArea.prototype.draw=function() {
     // draw crop area
-    this._cropCanvas.drawCropArea(this._image,[this._x,this._y],this._size,this._drawArea);
+    this._cropCanvas.drawCropArea(this._image,[this._x,this._y],this._size,this._drawArea, this._imageRotation);
   };
 
   CropArea.prototype.processMouseMove=function() {};

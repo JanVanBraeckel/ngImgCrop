@@ -99,11 +99,7 @@ crop.factory('cropCanvas', [function() {
 
     /* Crop Area */
 
-    this.drawCropArea=function(image, centerCoords, size, fnDrawClipPath) {
-      var xRatio=image.width/ctx.canvas.width,
-          yRatio=image.height/ctx.canvas.height,
-          xLeft=centerCoords[0]-size/2,
-          yTop=centerCoords[1]-size/2;
+    this.drawCropArea=function(image, centerCoords, size, fnDrawClipPath, imageRotation) {
 
       ctx.save();
       ctx.strokeStyle = colors.areaOutline;
@@ -115,7 +111,17 @@ crop.factory('cropCanvas', [function() {
 
       // draw part of original image
       if (size > 0) {
-          ctx.drawImage(image, xLeft*xRatio, yTop*yRatio, size*xRatio, size*yRatio, xLeft, yTop, size, size);
+        var changeXY = imageRotation === 90 || imageRotation === 270;
+        var width = (changeXY ? ctx.canvas.height : ctx.canvas.width);
+        var height = (changeXY ? ctx.canvas.width : ctx.canvas.height);
+
+        ctx.save();
+        ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2);
+        ctx.rotate(imageRotation * Math.PI / 180);
+
+        // draw source image
+        ctx.drawImage(image, width / 2, height / 2, -width, -height);
+        ctx.restore();
       }
 
       ctx.beginPath();

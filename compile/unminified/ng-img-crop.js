@@ -2,10 +2,10 @@
  * ngImgCrop v0.3.2
  * https://github.com/alexk111/ngImgCrop
  *
- * Copyright (c) 2014 Alex Kaul
+ * Copyright (c) 2017 Alex Kaul
  * License: MIT
  *
- * Generated at Wednesday, December 3rd, 2014, 3:54:12 PM
+ * Generated at Thursday, May 18th, 2017, 12:27:24 PM
  */
 (function() {
 'use strict';
@@ -386,6 +386,7 @@ crop.factory('cropArea', ['cropCanvas', function(CropCanvas) {
     this._cropCanvas=new CropCanvas(ctx);
 
     this._image=new Image();
+    this._imageRotation = 0;
     this._x = 0;
     this._y = 0;
     this._size = 200;
@@ -396,8 +397,9 @@ crop.factory('cropArea', ['cropCanvas', function(CropCanvas) {
   CropArea.prototype.getImage = function () {
     return this._image;
   };
-  CropArea.prototype.setImage = function (image) {
+  CropArea.prototype.setImage = function (image, imageRotation) {
     this._image = image;
+    this._imageRotation = imageRotation;
   };
 
   CropArea.prototype.getX = function () {
@@ -449,7 +451,7 @@ crop.factory('cropArea', ['cropCanvas', function(CropCanvas) {
 
   CropArea.prototype.draw=function() {
     // draw crop area
-    this._cropCanvas.drawCropArea(this._image,[this._x,this._y],this._size,this._drawArea);
+    this._cropCanvas.drawCropArea(this._image,[this._x,this._y],this._size,this._drawArea, this._imageRotation);
   };
 
   CropArea.prototype.processMouseMove=function() {};
@@ -559,11 +561,7 @@ crop.factory('cropCanvas', [function() {
 
     /* Crop Area */
 
-    this.drawCropArea=function(image, centerCoords, size, fnDrawClipPath) {
-      var xRatio=image.width/ctx.canvas.width,
-          yRatio=image.height/ctx.canvas.height,
-          xLeft=centerCoords[0]-size/2,
-          yTop=centerCoords[1]-size/2;
+    this.drawCropArea=function(image, centerCoords, size, fnDrawClipPath, imageRotation) {
 
       ctx.save();
       ctx.strokeStyle = colors.areaOutline;
@@ -575,7 +573,17 @@ crop.factory('cropCanvas', [function() {
 
       // draw part of original image
       if (size > 0) {
-          ctx.drawImage(image, xLeft*xRatio, yTop*yRatio, size*xRatio, size*yRatio, xLeft, yTop, size, size);
+        var changeXY = imageRotation === 90 || imageRotation === 270;
+        var width = (changeXY ? ctx.canvas.height : ctx.canvas.width);
+        var height = (changeXY ? ctx.canvas.width : ctx.canvas.height);
+
+        ctx.save();
+        ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2);
+        ctx.rotate(imageRotation * Math.PI / 180);
+
+        // draw source image
+        ctx.drawImage(image, width / 2, height / 2, -width, -height);
+        ctx.restore();
       }
 
       ctx.beginPath();
@@ -1368,368 +1376,377 @@ crop.service('cropEXIF', [function() {
   }
 }]);
 
-crop.factory('cropHost', ['$document', 'cropAreaCircle', 'cropAreaSquare', 'cropEXIF', function($document, CropAreaCircle, CropAreaSquare, cropEXIF) {
-  /* STATIC FUNCTIONS */
+crop.factory('cropHost', ['$document', 'cropAreaCircle', 'cropAreaSquare', 'cropEXIF', function ($document, CropAreaCircle, CropAreaSquare, cropEXIF) {
+    /* STATIC FUNCTIONS */
 
-  // Get Element's Offset
-  var getElementOffset=function(elem) {
-      var box = elem.getBoundingClientRect();
+    // Get Element's Offset
+    var getElementOffset = function (elem) {
+        var box = elem.getBoundingClientRect();
 
-      var body = document.body;
-      var docElem = document.documentElement;
+        var body = document.body;
+        var docElem = document.documentElement;
 
-      var scrollTop = window.pageYOffset || docElem.scrollTop || body.scrollTop;
-      var scrollLeft = window.pageXOffset || docElem.scrollLeft || body.scrollLeft;
+        var scrollTop = window.pageYOffset || docElem.scrollTop || body.scrollTop;
+        var scrollLeft = window.pageXOffset || docElem.scrollLeft || body.scrollLeft;
 
-      var clientTop = docElem.clientTop || body.clientTop || 0;
-      var clientLeft = docElem.clientLeft || body.clientLeft || 0;
+        var clientTop = docElem.clientTop || body.clientTop || 0;
+        var clientLeft = docElem.clientLeft || body.clientLeft || 0;
 
-      var top  = box.top +  scrollTop - clientTop;
-      var left = box.left + scrollLeft - clientLeft;
+        var top = box.top + scrollTop - clientTop;
+        var left = box.left + scrollLeft - clientLeft;
 
-      return { top: Math.round(top), left: Math.round(left) };
-  };
-
-  return function(elCanvas, opts, events){
-    /* PRIVATE VARIABLES */
-
-    // Object Pointers
-    var ctx=null,
-        image=null,
-        theArea=null;
-
-    // Dimensions
-    var minCanvasDims=[100,100],
-        maxCanvasDims=[300,300];
-
-    // Result Image size
-    var resImgSize=200;
-
-    // Result Image type
-    var resImgFormat='image/png';
-
-    // Result Image quality
-    var resImgQuality=null;
-
-    /* PRIVATE FUNCTIONS */
-
-    // Draw Scene
-    function drawScene() {
-      // clear canvas
-      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-      if(image!==null) {
-        // draw source image
-        ctx.drawImage(image, 0, 0, ctx.canvas.width, ctx.canvas.height);
-
-        ctx.save();
-
-        // and make it darker
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-        ctx.restore();
-
-        // draw Area
-        theArea.draw();
-      }
-    }
-
-    // Resets CropHost
-    var resetCropHost=function() {
-      if(image!==null) {
-        theArea.setImage(image);
-        var imageDims=[image.width, image.height],
-            imageRatio=image.width/image.height,
-            canvasDims=imageDims;
-
-        if(canvasDims[0]>maxCanvasDims[0]) {
-          canvasDims[0]=maxCanvasDims[0];
-          canvasDims[1]=canvasDims[0]/imageRatio;
-        } else if(canvasDims[0]<minCanvasDims[0]) {
-          canvasDims[0]=minCanvasDims[0];
-          canvasDims[1]=canvasDims[0]/imageRatio;
-        }
-        if(canvasDims[1]>maxCanvasDims[1]) {
-          canvasDims[1]=maxCanvasDims[1];
-          canvasDims[0]=canvasDims[1]*imageRatio;
-        } else if(canvasDims[1]<minCanvasDims[1]) {
-          canvasDims[1]=minCanvasDims[1];
-          canvasDims[0]=canvasDims[1]*imageRatio;
-        }
-        elCanvas.prop('width',canvasDims[0]).prop('height',canvasDims[1]).css({'margin-left': -canvasDims[0]/2+'px', 'margin-top': -canvasDims[1]/2+'px'});
-
-        theArea.setX(ctx.canvas.width/2);
-        theArea.setY(ctx.canvas.height/2);
-        theArea.setSize(Math.min(200, ctx.canvas.width/2, ctx.canvas.height/2));
-      } else {
-        elCanvas.prop('width',0).prop('height',0).css({'margin-top': 0});
-      }
-
-      drawScene();
+        return { top: Math.round(top), left: Math.round(left) };
     };
 
-    /**
-     * Returns event.changedTouches directly if event is a TouchEvent.
-     * If event is a jQuery event, return changedTouches of event.originalEvent
-     */
-    var getChangedTouches=function(event){
-      if(angular.isDefined(event.changedTouches)){
-        return event.changedTouches;
-      }else{
-        return event.originalEvent.changedTouches;
-      }
-    };
+    return function (elCanvas, opts, events) {
+        /* PRIVATE VARIABLES */
 
-    var onMouseMove=function(e) {
-      if(image!==null) {
-        var offset=getElementOffset(ctx.canvas),
-            pageX, pageY;
-        if(e.type === 'touchmove') {
-          pageX=getChangedTouches(e)[0].pageX;
-          pageY=getChangedTouches(e)[0].pageY;
-        } else {
-          pageX=e.pageX;
-          pageY=e.pageY;
-        }
-        theArea.processMouseMove(pageX-offset.left, pageY-offset.top);
-        drawScene();
-      }
-    };
+        // Object Pointers
+        var ctx = null,
+            image = null,
+            theArea = null;
 
-    var onMouseDown=function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      if(image!==null) {
-        var offset=getElementOffset(ctx.canvas),
-            pageX, pageY;
-        if(e.type === 'touchstart') {
-          pageX=getChangedTouches(e)[0].pageX;
-          pageY=getChangedTouches(e)[0].pageY;
-        } else {
-          pageX=e.pageX;
-          pageY=e.pageY;
-        }
-        theArea.processMouseDown(pageX-offset.left, pageY-offset.top);
-        drawScene();
-      }
-    };
+        var imageRotation = 0;
+        var changeXY = false;
 
-    var onMouseUp=function(e) {
-      if(image!==null) {
-        var offset=getElementOffset(ctx.canvas),
-            pageX, pageY;
-        if(e.type === 'touchend') {
-          pageX=getChangedTouches(e)[0].pageX;
-          pageY=getChangedTouches(e)[0].pageY;
-        } else {
-          pageX=e.pageX;
-          pageY=e.pageY;
-        }
-        theArea.processMouseUp(pageX-offset.left, pageY-offset.top);
-        drawScene();
-      }
-    };
+        // Dimensions
+        var minCanvasDims = [100, 100],
+            maxCanvasDims = [300, 300];
 
-    this.getResultImageDataURI=function() {
-      var temp_ctx, temp_canvas;
-      temp_canvas = angular.element('<canvas></canvas>')[0];
-      temp_ctx = temp_canvas.getContext('2d');
-      temp_canvas.width = resImgSize;
-      temp_canvas.height = resImgSize;
-      if(image!==null){
-        temp_ctx.drawImage(image, (theArea.getX()-theArea.getSize()/2)*(image.width/ctx.canvas.width), (theArea.getY()-theArea.getSize()/2)*(image.height/ctx.canvas.height), theArea.getSize()*(image.width/ctx.canvas.width), theArea.getSize()*(image.height/ctx.canvas.height), 0, 0, resImgSize, resImgSize);
-      }
-      if (resImgQuality!==null ){
-        return temp_canvas.toDataURL(resImgFormat, resImgQuality);
-      }
-      return temp_canvas.toDataURL(resImgFormat);
-    };
+        // Result Image size
+        var resImgSize = 200;
 
-    this.setNewImageSource=function(imageSource) {
-      image=null;
-      resetCropHost();
-      events.trigger('image-updated');
-      if(!!imageSource) {
-        var newImage = new Image();
-        if(imageSource.substring(0,4).toLowerCase()==='http') {
-          newImage.crossOrigin = 'anonymous';
-        }
-        newImage.onload = function(){
-          events.trigger('load-done');
+        // Result Image type
+        var resImgFormat = 'image/png';
 
-          cropEXIF.getData(newImage,function(){
-            var orientation=cropEXIF.getTag(newImage,'Orientation');
+        // Result Image quality
+        var resImgQuality = null;
 
-            if([3,6,8].indexOf(orientation)>-1) {
-              var canvas = document.createElement("canvas"),
-                  ctx=canvas.getContext("2d"),
-                  cw = newImage.width, ch = newImage.height, cx = 0, cy = 0, deg=0;
-              switch(orientation) {
-                case 3:
-                  cx=-newImage.width;
-                  cy=-newImage.height;
-                  deg=180;
-                  break;
-                case 6:
-                  cw = newImage.height;
-                  ch = newImage.width;
-                  cy=-newImage.height;
-                  deg=90;
-                  break;
-                case 8:
-                  cw = newImage.height;
-                  ch = newImage.width;
-                  cx=-newImage.width;
-                  deg=270;
-                  break;
-              }
+        /* PRIVATE FUNCTIONS */
 
-              canvas.width = cw;
-              canvas.height = ch;
-              ctx.rotate(deg*Math.PI/180);
-              ctx.drawImage(newImage, cx, cy);
+        // Draw Scene
+        function drawScene() {
+            // clear canvas
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-              image=new Image();
-              image.src = canvas.toDataURL("image/png");
-            } else {
-              image=newImage;
+            if (image !== null) {
+
+                var width = (changeXY ? ctx.canvas.height : ctx.canvas.width);
+                var height = (changeXY ? ctx.canvas.width : ctx.canvas.height);
+
+                ctx.save();
+                ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2);
+                ctx.rotate(imageRotation * Math.PI / 180);
+
+                // draw source image
+                ctx.drawImage(image, width / 2, height / 2, -width, -height);
+                ctx.restore();
+
+                ctx.save();
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+                ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                ctx.restore();
+
+                // and make it darker
+                ctx.save();
+                theArea.draw();
+                ctx.restore();
             }
+        }
+
+        // Resets CropHost
+        var resetCropHost = function () {
+            if (image !== null) {
+                theArea.setImage(image, imageRotation);
+                var imageDims = [image.width, image.height],
+                    imageRatio = image.width / image.height,
+                    canvasDims = imageDims;
+
+                if (canvasDims[0] > maxCanvasDims[0]) {
+                    canvasDims[0] = maxCanvasDims[0];
+                    canvasDims[1] = canvasDims[0] / imageRatio;
+                } else if (canvasDims[0] < minCanvasDims[0]) {
+                    canvasDims[0] = minCanvasDims[0];
+                    canvasDims[1] = canvasDims[0] / imageRatio;
+                }
+                if (canvasDims[1] > maxCanvasDims[1]) {
+                    canvasDims[1] = maxCanvasDims[1];
+                    canvasDims[0] = canvasDims[1] * imageRatio;
+                } else if (canvasDims[1] < minCanvasDims[1]) {
+                    canvasDims[1] = minCanvasDims[1];
+                    canvasDims[0] = canvasDims[1] * imageRatio;
+                }
+                if (changeXY) {
+                    var aux = canvasDims[0];
+                    canvasDims[0] = canvasDims[1];
+                    canvasDims[1] = aux;
+                }
+
+                elCanvas.prop('width', canvasDims[0]).prop('height', canvasDims[1]).css({ 'margin-left': -canvasDims[0] / 2 + 'px', 'margin-top': -canvasDims[1] / 2 + 'px' });
+
+                theArea.setX(ctx.canvas.width / 2);
+                theArea.setY(ctx.canvas.height / 2);
+                theArea.setSize(Math.min(200, ctx.canvas.width / 2, ctx.canvas.height / 2));
+            } else {
+                elCanvas.prop('width', 0).prop('height', 0).css({ 'margin-top': 0 });
+            }
+
+            drawScene();
+        };
+
+        /**
+         * Returns event.changedTouches directly if event is a TouchEvent.
+         * If event is a jQuery event, return changedTouches of event.originalEvent
+         */
+        var getChangedTouches = function (event) {
+            if (angular.isDefined(event.changedTouches)) {
+                return event.changedTouches;
+            } else {
+                return event.originalEvent.changedTouches;
+            }
+        };
+
+        var onMouseMove = function (e) {
+            if (image !== null) {
+                var offset = getElementOffset(ctx.canvas),
+                    pageX, pageY;
+                if (e.type === 'touchmove') {
+                    pageX = getChangedTouches(e)[0].pageX;
+                    pageY = getChangedTouches(e)[0].pageY;
+                } else {
+                    pageX = e.pageX;
+                    pageY = e.pageY;
+                }
+                theArea.processMouseMove(pageX - offset.left, pageY - offset.top);
+                drawScene();
+            }
+        };
+
+        var onMouseDown = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (image !== null) {
+                var offset = getElementOffset(ctx.canvas),
+                    pageX, pageY;
+                if (e.type === 'touchstart') {
+                    pageX = getChangedTouches(e)[0].pageX;
+                    pageY = getChangedTouches(e)[0].pageY;
+                } else {
+                    pageX = e.pageX;
+                    pageY = e.pageY;
+                }
+                theArea.processMouseDown(pageX - offset.left, pageY - offset.top);
+                drawScene();
+            }
+        };
+
+        var onMouseUp = function (e) {
+            if (image !== null) {
+                var offset = getElementOffset(ctx.canvas),
+                    pageX, pageY;
+                if (e.type === 'touchend') {
+                    pageX = getChangedTouches(e)[0].pageX;
+                    pageY = getChangedTouches(e)[0].pageY;
+                } else {
+                    pageX = e.pageX;
+                    pageY = e.pageY;
+                }
+                theArea.processMouseUp(pageX - offset.left, pageY - offset.top);
+                drawScene();
+            }
+        };
+
+        this.getCropArea = function () {
+            var temp_ctx, temp_canvas;
+            temp_canvas = angular.element('<canvas></canvas>')[0];
+            temp_ctx = temp_canvas.getContext('2d');
+            temp_canvas.width = resImgSize;
+            temp_canvas.height = resImgSize;
+            if (image) {
+                var imgWidth = changeXY ? image.height : image.width;
+                var imgHeight = changeXY ? image.width : image.height;
+                return {
+                    x: (theArea.getX() - theArea.getSize() / 2) * (imgWidth / ctx.canvas.width),
+                    y: (theArea.getY() - theArea.getSize() / 2) * (imgHeight / ctx.canvas.height),
+                    width: theArea.getSize() * (imgWidth / ctx.canvas.width),
+                    height: theArea.getSize() * (imgHeight / ctx.canvas.height),
+                    rotation: imageRotation,
+                };
+            }
+            return null;
+        };
+
+        this.setNewImageSource = function (imageSource) {
+            image = null;
             resetCropHost();
             events.trigger('image-updated');
-          });
+            if (!!imageSource) {
+                var newImage = new Image();
+                if (imageSource.substring(0, 4).toLowerCase() === 'http') {
+                    newImage.crossOrigin = 'anonymous';
+                }
+
+                newImage.onload = function () {
+                    events.trigger('load-done');
+
+                    cropEXIF.getData(newImage, function () {
+
+                        var orientation = cropEXIF.getTag(newImage, 'Orientation');
+                        if ([3, 6, 8].indexOf(orientation) > -1) {
+                            switch (orientation) {
+                                case 3:
+                                    imageRotation = 180;
+                                    break;
+                                case 6:
+                                    imageRotation = 90;
+                                    changeXY = true;
+                                    break;
+                                case 8:
+                                    imageRotation = 270;
+                                    changeXY = true;
+                                    break;
+                            }
+                        } else {
+                            imageRotation = 0;
+                            changeXY = false;
+                        }
+                        image = newImage;
+
+                        resetCropHost();
+                        events.trigger('image-updated');
+                    });
+                };
+                newImage.onerror = function () {
+                    events.trigger('load-error');
+                };
+                events.trigger('load-start');
+                newImage.src = imageSource;
+            }
         };
-        newImage.onerror=function() {
-          events.trigger('load-error');
+
+        this.setMaxDimensions = function (width, height) {
+            maxCanvasDims = [width, height];
+
+            if (image !== null) {
+                var curWidth = ctx.canvas.width,
+                    curHeight = ctx.canvas.height;
+
+                var imageDims = [image.width, image.height],
+                    imageRatio = image.width / image.height,
+                    canvasDims = imageDims;
+
+                if (canvasDims[0] > maxCanvasDims[0]) {
+                    canvasDims[0] = maxCanvasDims[0];
+                    canvasDims[1] = canvasDims[0] / imageRatio;
+                } else if (canvasDims[0] < minCanvasDims[0]) {
+                    canvasDims[0] = minCanvasDims[0];
+                    canvasDims[1] = canvasDims[0] / imageRatio;
+                }
+                if (canvasDims[1] > maxCanvasDims[1]) {
+                    canvasDims[1] = maxCanvasDims[1];
+                    canvasDims[0] = canvasDims[1] * imageRatio;
+                } else if (canvasDims[1] < minCanvasDims[1]) {
+                    canvasDims[1] = minCanvasDims[1];
+                    canvasDims[0] = canvasDims[1] * imageRatio;
+                }
+                elCanvas.prop('width', canvasDims[0]).prop('height', canvasDims[1]).css({ 'margin-left': -canvasDims[0] / 2 + 'px', 'margin-top': -canvasDims[1] / 2 + 'px' });
+
+                var ratioNewCurWidth = ctx.canvas.width / curWidth,
+                    ratioNewCurHeight = ctx.canvas.height / curHeight,
+                    ratioMin = Math.min(ratioNewCurWidth, ratioNewCurHeight);
+
+                theArea.setX(theArea.getX() * ratioNewCurWidth);
+                theArea.setY(theArea.getY() * ratioNewCurHeight);
+                theArea.setSize(theArea.getSize() * ratioMin);
+            } else {
+                elCanvas.prop('width', 0).prop('height', 0).css({ 'margin-top': 0 });
+            }
+
+            drawScene();
+
         };
-        events.trigger('load-start');
-        newImage.src=imageSource;
-      }
+
+        this.setAreaMinSize = function (size) {
+            size = parseInt(size, 10);
+            if (!isNaN(size)) {
+                theArea.setMinSize(size);
+                drawScene();
+            }
+        };
+
+        this.setResultImageSize = function (size) {
+            size = parseInt(size, 10);
+            if (!isNaN(size)) {
+                resImgSize = size;
+            }
+        };
+
+        this.setResultImageFormat = function (format) {
+            resImgFormat = format;
+        };
+
+        this.setResultImageQuality = function (quality) {
+            quality = parseFloat(quality);
+            if (!isNaN(quality) && quality >= 0 && quality <= 1) {
+                resImgQuality = quality;
+            }
+        };
+
+        this.setAreaType = function (type) {
+            var curSize = theArea.getSize(),
+                curMinSize = theArea.getMinSize(),
+                curX = theArea.getX(),
+                curY = theArea.getY();
+
+            var AreaClass = CropAreaCircle;
+            if (type === 'square') {
+                AreaClass = CropAreaSquare;
+            }
+            theArea = new AreaClass(ctx, events);
+            theArea.setMinSize(curMinSize);
+            theArea.setSize(curSize);
+            theArea.setX(curX);
+            theArea.setY(curY);
+
+            // resetCropHost();
+            if (image !== null) {
+                theArea.setImage(image, imageRotation);
+            }
+
+            drawScene();
+        };
+
+        /* Life Cycle begins */
+
+        // Init Context var
+        ctx = elCanvas[0].getContext('2d');
+
+        // Init CropArea
+        theArea = new CropAreaCircle(ctx, events);
+
+        // Init Mouse Event Listeners
+        $document.on('mousemove', onMouseMove);
+        elCanvas.on('mousedown', onMouseDown);
+        $document.on('mouseup', onMouseUp);
+
+        // Init Touch Event Listeners
+        $document.on('touchmove', onMouseMove);
+        elCanvas.on('touchstart', onMouseDown);
+        $document.on('touchend', onMouseUp);
+
+        // CropHost Destructor
+        this.destroy = function () {
+            $document.off('mousemove', onMouseMove);
+            elCanvas.off('mousedown', onMouseDown);
+            $document.off('mouseup', onMouseMove);
+
+            $document.off('touchmove', onMouseMove);
+            elCanvas.off('touchstart', onMouseDown);
+            $document.off('touchend', onMouseMove);
+
+            elCanvas.remove();
+        };
     };
-
-    this.setMaxDimensions=function(width, height) {
-      maxCanvasDims=[width,height];
-
-      if(image!==null) {
-        var curWidth=ctx.canvas.width,
-            curHeight=ctx.canvas.height;
-
-        var imageDims=[image.width, image.height],
-            imageRatio=image.width/image.height,
-            canvasDims=imageDims;
-
-        if(canvasDims[0]>maxCanvasDims[0]) {
-          canvasDims[0]=maxCanvasDims[0];
-          canvasDims[1]=canvasDims[0]/imageRatio;
-        } else if(canvasDims[0]<minCanvasDims[0]) {
-          canvasDims[0]=minCanvasDims[0];
-          canvasDims[1]=canvasDims[0]/imageRatio;
-        }
-        if(canvasDims[1]>maxCanvasDims[1]) {
-          canvasDims[1]=maxCanvasDims[1];
-          canvasDims[0]=canvasDims[1]*imageRatio;
-        } else if(canvasDims[1]<minCanvasDims[1]) {
-          canvasDims[1]=minCanvasDims[1];
-          canvasDims[0]=canvasDims[1]*imageRatio;
-        }
-        elCanvas.prop('width',canvasDims[0]).prop('height',canvasDims[1]).css({'margin-left': -canvasDims[0]/2+'px', 'margin-top': -canvasDims[1]/2+'px'});
-
-        var ratioNewCurWidth=ctx.canvas.width/curWidth,
-            ratioNewCurHeight=ctx.canvas.height/curHeight,
-            ratioMin=Math.min(ratioNewCurWidth, ratioNewCurHeight);
-
-        theArea.setX(theArea.getX()*ratioNewCurWidth);
-        theArea.setY(theArea.getY()*ratioNewCurHeight);
-        theArea.setSize(theArea.getSize()*ratioMin);
-      } else {
-        elCanvas.prop('width',0).prop('height',0).css({'margin-top': 0});
-      }
-
-      drawScene();
-
-    };
-
-    this.setAreaMinSize=function(size) {
-      size=parseInt(size,10);
-      if(!isNaN(size)) {
-        theArea.setMinSize(size);
-        drawScene();
-      }
-    };
-
-    this.setResultImageSize=function(size) {
-      size=parseInt(size,10);
-      if(!isNaN(size)) {
-        resImgSize=size;
-      }
-    };
-
-    this.setResultImageFormat=function(format) {
-      resImgFormat = format;
-    };
-
-    this.setResultImageQuality=function(quality){
-      quality = parseFloat(quality);
-      if (!isNaN(quality) && quality>=0 && quality<=1){
-        resImgQuality = quality;
-      }
-    };
-
-    this.setAreaType=function(type) {
-      var curSize=theArea.getSize(),
-          curMinSize=theArea.getMinSize(),
-          curX=theArea.getX(),
-          curY=theArea.getY();
-
-      var AreaClass=CropAreaCircle;
-      if(type==='square') {
-        AreaClass=CropAreaSquare;
-      }
-      theArea = new AreaClass(ctx, events);
-      theArea.setMinSize(curMinSize);
-      theArea.setSize(curSize);
-      theArea.setX(curX);
-      theArea.setY(curY);
-
-      // resetCropHost();
-      if(image!==null) {
-        theArea.setImage(image);
-      }
-
-      drawScene();
-    };
-
-    /* Life Cycle begins */
-
-    // Init Context var
-    ctx = elCanvas[0].getContext('2d');
-
-    // Init CropArea
-    theArea = new CropAreaCircle(ctx, events);
-
-    // Init Mouse Event Listeners
-    $document.on('mousemove',onMouseMove);
-    elCanvas.on('mousedown',onMouseDown);
-    $document.on('mouseup',onMouseUp);
-
-    // Init Touch Event Listeners
-    $document.on('touchmove',onMouseMove);
-    elCanvas.on('touchstart',onMouseDown);
-    $document.on('touchend',onMouseUp);
-
-    // CropHost Destructor
-    this.destroy=function() {
-      $document.off('mousemove',onMouseMove);
-      elCanvas.off('mousedown',onMouseDown);
-      $document.off('mouseup',onMouseMove);
-
-      $document.off('touchmove',onMouseMove);
-      elCanvas.off('touchstart',onMouseDown);
-      $document.off('touchend',onMouseMove);
-
-      elCanvas.remove();
-    };
-  };
 
 }]);
 
@@ -1770,7 +1787,7 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
       resultImageSize: '=',
       resultImageFormat: '@',
       resultImageQuality: '=',
-
+      cropArea: '=',
       onChange: '&',
       onLoadBegin: '&',
       onLoadDone: '&',
@@ -1789,17 +1806,6 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
 
       // Store Result Image to check if it's changed
       var storedResultImage;
-
-      var updateResultImage=function(scope) {
-        var resultImage=cropHost.getResultImageDataURI();
-        if(storedResultImage!==resultImage) {
-          storedResultImage=resultImage;
-          if(angular.isDefined(scope.resultImage)) {
-            scope.resultImage=resultImage;
-          }
-          scope.onChange({$dataURI: scope.resultImage});
-        }
-      };
 
       // Wrapper to safely exec functions within $apply on a running $digest cycle
       var fnSafeApply=function(fn) {
@@ -1823,13 +1829,8 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
         .on('load-error', fnSafeApply(function(scope){
           scope.onLoadError({});
         }))
-        .on('area-move area-resize', fnSafeApply(function(scope){
-          if(!!scope.changeOnFly) {
-            updateResultImage(scope);
-          }
-        }))
         .on('area-move-end area-resize-end image-updated', fnSafeApply(function(scope){
-          updateResultImage(scope);
+          scope.cropArea = cropHost.getCropArea();
         }));
 
       // Sync CropHost with Directive's options
@@ -1838,23 +1839,18 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
       });
       scope.$watch('areaType',function(){
         cropHost.setAreaType(scope.areaType);
-        updateResultImage(scope);
       });
       scope.$watch('areaMinSize',function(){
         cropHost.setAreaMinSize(scope.areaMinSize);
-        updateResultImage(scope);
       });
       scope.$watch('resultImageSize',function(){
         cropHost.setResultImageSize(scope.resultImageSize);
-        updateResultImage(scope);
       });
       scope.$watch('resultImageFormat',function(){
         cropHost.setResultImageFormat(scope.resultImageFormat);
-        updateResultImage(scope);
       });
       scope.$watch('resultImageQuality',function(){
         cropHost.setResultImageQuality(scope.resultImageQuality);
-        updateResultImage(scope);
       });
 
       // Update CropHost dimensions when the directive element is resized
@@ -1864,7 +1860,6 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
         },
         function (value) {
           cropHost.setMaxDimensions(value[0],value[1]);
-          updateResultImage(scope);
         },
         true
       );

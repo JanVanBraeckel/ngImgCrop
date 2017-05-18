@@ -33,18 +33,6 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
       // Store Result Image to check if it's changed
       var storedResultImage;
 
-      //Cropping image is done server side
-      var updateResultImage=function(scope) {
-        // var resultImage=cropHost.getResultImageDataURI();
-        // if(storedResultImage!==resultImage) {
-        //   storedResultImage=resultImage;
-        //   if(angular.isDefined(scope.resultImage)) {
-        //     scope.resultImage=resultImage;
-        //   }
-        //   scope.onChange({$dataURI: scope.resultImage});
-        // }
-      };
-
       // Wrapper to safely exec functions within $apply on a running $digest cycle
       var fnSafeApply=function(fn) {
         return function(){
@@ -67,13 +55,7 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
         .on('load-error', fnSafeApply(function(scope){
           scope.onLoadError({});
         }))
-        .on('area-move area-resize', fnSafeApply(function(scope){
-          if(!!scope.changeOnFly) {
-            updateResultImage(scope);
-          }
-        }))
         .on('area-move-end area-resize-end image-updated', fnSafeApply(function(scope){
-          updateResultImage(scope);
           scope.cropArea = cropHost.getCropArea();
         }));
 
@@ -83,23 +65,18 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
       });
       scope.$watch('areaType',function(){
         cropHost.setAreaType(scope.areaType);
-        updateResultImage(scope);
       });
       scope.$watch('areaMinSize',function(){
         cropHost.setAreaMinSize(scope.areaMinSize);
-        updateResultImage(scope);
       });
       scope.$watch('resultImageSize',function(){
         cropHost.setResultImageSize(scope.resultImageSize);
-        updateResultImage(scope);
       });
       scope.$watch('resultImageFormat',function(){
         cropHost.setResultImageFormat(scope.resultImageFormat);
-        updateResultImage(scope);
       });
       scope.$watch('resultImageQuality',function(){
         cropHost.setResultImageQuality(scope.resultImageQuality);
-        updateResultImage(scope);
       });
 
       // Update CropHost dimensions when the directive element is resized
@@ -109,7 +86,6 @@ crop.directive('imgCrop', ['$timeout', 'cropHost', 'cropPubSub', function($timeo
         },
         function (value) {
           cropHost.setMaxDimensions(value[0],value[1]);
-          updateResultImage(scope);
         },
         true
       );
